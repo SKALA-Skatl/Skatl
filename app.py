@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
-from rag import COLLECTIONS, RAGConfig, build_documents_from_paths, get_collection_names
+from rag import RAGConfig, build_documents_from_paths, get_collection_names
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -14,46 +13,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="SKATL RAG utilities")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    inspect_parser = subparsers.add_parser("inspect-docs", help="Inspect parsed chunks before indexing")
-    _add_common_config_args(inspect_parser)
-    inspect_parser.add_argument("--sample-size", type=int, default=8)
-
-    inspect_tables_parser = subparsers.add_parser("inspect-tables", help="Inspect extracted table chunks")
-    _add_common_config_args(inspect_tables_parser)
-    inspect_tables_parser.add_argument("--source", help="Filter by source file name, e.g. catl.pdf")
-    inspect_tables_parser.add_argument("--limit", type=int, default=10)
-    inspect_tables_parser.add_argument("--save-path", help="Optional path to save the rendered table samples")
-
-    collections_parser = subparsers.add_parser("list-collections", help="List available RAG collections")
-    _add_common_config_args(collections_parser)
-
     build_parser = subparsers.add_parser("build-indices", help="Build FAISS indices for agent collections")
     _add_common_config_args(build_parser)
     build_parser.add_argument("--collection", action="append", choices=get_collection_names())
-
-    query_parser = subparsers.add_parser("query", help="Query the local FAISS index")
-    _add_common_config_args(query_parser)
-    query_parser.add_argument("--collection", required=True, choices=get_collection_names())
-    query_parser.add_argument("--question", required=True)
-    query_parser.add_argument("--k", type=int, default=5)
-
-    agentic_query_parser = subparsers.add_parser("agentic-query", help="Run the agentic retrieval loop")
-    _add_common_config_args(agentic_query_parser)
-    agentic_query_parser.add_argument("--collection", required=True, choices=get_collection_names())
-    agentic_query_parser.add_argument("--question", required=True)
-    agentic_query_parser.add_argument("--k", type=int, default=6)
-    agentic_query_parser.add_argument("--per-query-k", type=int, default=4)
-    agentic_query_parser.add_argument("--max-rounds", type=int, default=2)
-
-    state_parser = subparsers.add_parser("build-state", help="Build a pipeline-ready retrieval state")
-    _add_common_config_args(state_parser)
-    state_parser.add_argument("--collection", required=True, choices=get_collection_names())
-    state_parser.add_argument("--question", required=True)
-    state_parser.add_argument("--k", type=int, default=6)
-    state_parser.add_argument("--per-query-k", type=int, default=4)
-    state_parser.add_argument("--max-rounds", type=int, default=2)
-    state_parser.add_argument("--save-json", help="Optional path to save the retrieval state as JSON")
-    state_parser.add_argument("--save-context", help="Optional path to save the prompt context text")
 
     args = parser.parse_args()
     config = RAGConfig(
@@ -61,25 +23,7 @@ def main() -> None:
         index_dir=Path(args.index_dir),
         embedding_model=args.embedding_model,
         table_backend=args.table_backend,
-        search_k=getattr(args, "k", 5),
     )
-
-    if args.command == "inspect-docs":
-        inspect_documents(config, sample_size=args.sample_size)
-        return
-
-    if args.command == "inspect-tables":
-        inspect_tables(
-            config,
-            source=args.source,
-            limit=args.limit,
-            save_path=Path(args.save_path).resolve() if args.save_path else None,
-        )
-        return
-
-    if args.command == "list-collections":
-        list_collections()
-        return
 
     if args.command == "build-indices":
         from rag.vectorstore import build_and_save_indices
@@ -259,32 +203,6 @@ def _load_documents(config: RAGConfig):
     if not paths:
         raise SystemExit(f"No PDF files found in {docs_dir}")
     return build_documents_from_paths(paths, config)
-
-
-def _print_samples(documents) -> None:
-    print(_render_samples(documents))
-
-
-def _render_samples(documents) -> str:
-    if not documents:
-        return "(no samples)"
-
-    sections: list[str] = []
-    for doc in documents:
-        sections.append("=" * 80)
-        sections.append(
-            "source={source} page={page} chunk_type={chunk_type} language={language} doc_role={doc_role} entity={entity} chunk_id={chunk_id}".format(
-                source=doc.metadata.get("source"),
-                page=doc.metadata.get("page"),
-                chunk_type=doc.metadata.get("chunk_type"),
-                language=doc.metadata.get("language"),
-                doc_role=doc.metadata.get("doc_role"),
-                entity=doc.metadata.get("entity"),
-                chunk_id=doc.metadata.get("chunk_id"),
-            )
-        )
-        sections.append(doc.page_content[:1200])
-    return "\n".join(sections)
 
 
 def _add_common_config_args(parser: argparse.ArgumentParser) -> None:
