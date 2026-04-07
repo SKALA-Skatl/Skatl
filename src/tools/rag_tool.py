@@ -5,7 +5,8 @@ RAG Tool 전역 초기화 및 @tool 래핑.
   - src/rag/vectorstore.load_index() 로 LangChain FAISS 인덱스 로드
     → src/rag/vectorstore.build_and_save_indices() 로 빌드한 인덱스와 포맷 일치
   - 인덱스 경로: {INDEX_DIR}/{collection_name}/  (LangChain FAISS 폴더 구조)
-  - 테스트에서는 initialize_rag_pipelines() 호출 않고 make_skon/catl_rag_tool을 mock
+  - market/skon/catl 컬렉션을 전역 파이프라인으로 올려 재사용
+  - 테스트에서는 initialize_rag_pipelines() 호출 않고 tool factory를 mock
 
 환경변수 (.env):
   INDEX_DIR        : 인덱스 루트 폴더 (기본: data/vectorstores)
@@ -133,6 +134,8 @@ def _get_market_rag() -> RAGPipeline:
 # ─────────────────────────────────────────────
 
 def _format_rag_result(result: RAGResult) -> str:
+    """Render RAG hits in a source-aware text format."""
+
     if not result.documents:
         return "관련 문서를 찾지 못했습니다."
     lines = [
@@ -141,10 +144,19 @@ def _format_rag_result(result: RAGResult) -> str:
         + (", 강제 반환" if result.forced_return else "") + ")\n"
     ]
     for i, doc in enumerate(result.documents, 1):
-        lines.append(
-            f"[{i}] {doc.source_title} (관련성: {doc.cosine_score:.3f})\n"
+        block = (
+            f"[{i}] source_id: rag_{doc.doc_id}\n"
+            f"title: {doc.source_title}\n"
+            f"page: {doc.page}\n"
+            f"source_type: {result.source_type.value}\n"
+            f"관련성: {doc.cosine_score:.3f}\n"
             f"출처: {doc.source_url}\n"
-            f"{doc.content}\n"
+        )
+        if doc.reference_text:
+            block += f"REFERENCE: {doc.reference_text}\n"
+        block += f"{doc.content}\n"
+        lines.append(
+            block
         )
     return "\n".join(lines)
 
@@ -168,6 +180,27 @@ def make_skon_rag_tool():
         )
         return _format_rag_result(result)
     return agentic_rag_skon
+
+
+def make_market_rag_tool():
+    @tool
+    async def market_agent_rag(query: str) -> str:
+        """
+        시장 리포트 PDF에서 정보를 검색합니다.
+        EV 성장률, 점유율, 기술 트렌드, 규제, 원가, ESS/HEV 전망 조회에 우선 사용하세요.
+        web_search보다 먼저 호출하고, 결과가 부족할 때 web_search로 보완하세요.
+        """
+        logger.tool_call("market_agent_rag", query=query)
+        result = await _get_market_rag().run(query)
+        logger.tool_result(
+            "market_agent_rag",
+            success=bool(result.documents),
+            metadata={"rewrite_count": result.rewrite_count,
+                      "forced_return": result.forced_return,
+                      "doc_count": len(result.documents)},
+        )
+        return _format_rag_result(result)
+    return market_agent_rag
 
 
 def make_catl_rag_tool():
