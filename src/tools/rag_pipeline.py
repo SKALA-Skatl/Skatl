@@ -13,7 +13,7 @@ RAG Pipeline 모듈.
 
 인덱스 포맷:
   src/rag/vectorstore.py 로 빌드한 LangChain FAISS 인덱스를 사용.
-  (data/vectorstores/{collection_name}/ 폴더)
+  (data/vectorstores/shared/ 폴더)
   L2 거리는 내부에서 cosine similarity로 변환:
     cosine = 1 - l2² / 2  (normalize_embeddings=True 전제)
 """
@@ -30,6 +30,7 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
+from rag.collections import get_allowed_sources
 from rag.constants import (
     COMPANY_SOURCE_BY_COLLECTION,
     ENTITY_HINTS,
@@ -121,6 +122,7 @@ class RAGPipeline:
         self.threshold       = relevance_threshold
         self.max_rewrites    = max_rewrites
         self.top_k           = top_k
+        self.allowed_sources = get_allowed_sources(collection_name) if collection_name else set()
 
         self._llm       = None
         self._llm_model = "gpt-4o-mini"
@@ -257,7 +259,7 @@ class RAGPipeline:
         fn = partial(
             self.vectorstore.similarity_search_with_score,
             query,
-            k=self.top_k,
+            k=max(self.top_k * 8, 20),
         )
         results = await loop.run_in_executor(None, fn)
 
@@ -268,6 +270,8 @@ class RAGPipeline:
             cosine = float(1.0 - (l2_dist ** 2) / 2.0)
             metadata = document.metadata
             source = str(metadata.get("source", ""))
+            if self.allowed_sources and source not in self.allowed_sources:
+                continue
             chunk_id = str(metadata.get("chunk_id", hash(document.page_content)))
             resolved = resolve_source_metadata(
                 source_id=chunk_id,
@@ -286,6 +290,8 @@ class RAGPipeline:
                 published_date=metadata.get("published_date"),
             ))
             scores.append(cosine)
+            if len(docs) >= self.top_k:
+                break
 
         return docs, scores
 

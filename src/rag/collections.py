@@ -28,16 +28,6 @@ COLLECTIONS: tuple[RAGCollection, ...] = (
         description="CATL analysis with company facts plus market context.",
         sources=("catl.pdf", "market_report.pdf", "analyst_report.pdf"),
     ),
-    RAGCollection(
-        name="swot_agent",
-        description="Comparative SWOT over all market and company references.",
-        sources=("market_report.pdf", "analyst_report.pdf", "catl.pdf", "skon.pdf"),
-    ),
-    RAGCollection(
-        name="report_agent",
-        description="Final report generation over the full reference corpus.",
-        sources=("market_report.pdf", "analyst_report.pdf", "catl.pdf", "skon.pdf"),
-    ),
 )
 
 
@@ -50,6 +40,10 @@ def get_collection(name: str) -> RAGCollection:
 
 def get_collection_names() -> list[str]:
     return [collection.name for collection in COLLECTIONS]
+
+
+def get_allowed_sources(name: str) -> set[str]:
+    return set(get_collection(name).sources)
 
 
 def filter_documents_for_collection(documents: list[Document], collection: RAGCollection) -> list[Document]:

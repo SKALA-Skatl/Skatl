@@ -13,9 +13,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="SKATL RAG utilities")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build-indices", help="Build FAISS indices for agent collections")
+    build_parser = subparsers.add_parser("build-indices", help="Build one shared FAISS index for all agent profiles")
     _add_common_config_args(build_parser)
-    build_parser.add_argument("--collection", action="append", choices=get_collection_names())
+    build_parser.add_argument(
+        "--collection",
+        action="append",
+        choices=get_collection_names(),
+        help="Limit the printed profile summary to selected agent profiles.",
+    )
 
     args = parser.parse_args()
     config = RAGConfig(

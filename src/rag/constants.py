@@ -21,8 +21,6 @@ ENTITY_HINTS = {
     ],
     "skon_agent": ["SK On", "SK온", "SK이노베이션 배터리"],
     "catl_agent": ["CATL", "宁德时代", "Contemporary Amperex Technology"],
-    "swot_agent": ["SK On", "CATL", "comparative SWOT", "비교 SWOT"],
-    "report_agent": ["battery strategy report", "market and company evidence", "전략 보고서 근거"],
 }
 
 # 질문 주제별로 추가 검색어를 붙일 때 사용합니다.

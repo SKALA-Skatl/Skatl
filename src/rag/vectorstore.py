@@ -10,7 +10,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from .collections import COLLECTIONS, filter_documents_for_collection, get_collection
+from .collections import COLLECTIONS, get_allowed_sources
 from .config import RAGConfig
 
 
@@ -20,38 +20,45 @@ def build_and_save_indices(
     project_root: Path,
     collection_names: list[str] | None = None,
 ) -> dict[str, dict[str, int]]:
-    """Build and save FAISS indices for one or more collections."""
+    """Build one shared FAISS index and summarize profile coverage."""
 
-    # 전체 문서를 컬렉션 단위로 다시 나눠 저장합니다.
     embeddings = _build_embeddings(config)
     index_root = config.resolved_index_dir(project_root)
     index_root.mkdir(parents=True, exist_ok=True)
 
     selected_names = collection_names or [collection.name for collection in COLLECTIONS]
     summary: dict[str, dict[str, int]] = {}
+    vectorstore = _build_and_save_single_index(
+        documents=documents,
+        embeddings=embeddings,
+        index_dir=config.resolved_shared_index_dir(project_root),
+    )
 
     for collection_name in selected_names:
-        collection = get_collection(collection_name)
-        collection_documents = filter_documents_for_collection(documents, collection)
-        vectorstore = _build_and_save_single_index(
-            documents=collection_documents,
-            embeddings=embeddings,
-            index_dir=config.resolved_collection_dir(project_root, collection.name),
+        allowed_sources = get_allowed_sources(collection_name)
+        document_count = sum(
+            1 for document in documents
+            if document.metadata.get("source") in allowed_sources
         )
-        summary[collection.name] = {
-            "documents": len(collection_documents),
-            "vectors": vectorstore.index.ntotal,
+        summary[collection_name] = {
+            "documents": document_count,
+            "vectors": document_count,
         }
+
+    summary["shared_index"] = {
+        "documents": len(documents),
+        "vectors": vectorstore.index.ntotal,
+    }
 
     manifest_path = index_root / "manifest.json"
     manifest_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return summary
 
 
-def load_index(config: RAGConfig, project_root: Path, collection_name: str) -> FAISS:
-    """Load one saved FAISS index."""
+def load_index(config: RAGConfig, project_root: Path, collection_name: str | None = None) -> FAISS:
+    """Load the shared FAISS index."""
 
-    index_dir = config.resolved_collection_dir(project_root, collection_name)
+    index_dir = config.resolved_shared_index_dir(project_root)
     return FAISS.load_local(
         str(index_dir),
         _build_embeddings(config),
@@ -67,10 +74,16 @@ def similarity_search(
     project_root: Path,
     k: int | None = None,
 ) -> list[Document]:
-    """Run a similarity search on one collection."""
+    """Run a collection-filtered similarity search on the shared index."""
 
     vectorstore = load_index(config, project_root, collection_name)
-    return vectorstore.similarity_search(question, k=k or config.search_k)
+    results = vectorstore.similarity_search(question, k=max((k or config.search_k) * 8, 20))
+    allowed_sources = get_allowed_sources(collection_name)
+    filtered = [
+        document for document in results
+        if document.metadata.get("source") in allowed_sources
+    ]
+    return filtered[: k or config.search_k]
 
 
 def _build_and_save_single_index(
