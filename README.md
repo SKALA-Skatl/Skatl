@@ -151,37 +151,29 @@ flowchart TD
 SKATL/
 ├── data/
 │   ├── docs/
-│   ├── vectorstores/
-│   ├── analyst_report.pdf
-│   ├── catl.pdf
-│   ├── market_report.pdf
-│   ├── skon.pdf
-│   └── manifest.json
-├── docs/
-│   └── agentic_rag_handoff.md
-├── mock_data/
-│   ├── battery_market_background_payload.json
-│   ├── battery_reference_catalog.json
-│   ├── battery_strategy_catl_payload.json
-│   ├── battery_strategy_comparison_brief.json
-│   ├── battery_strategy_human_review_2.json
-│   ├── battery_strategy_human_review_3_approve_sample.json
-│   ├── battery_strategy_human_review_3_reject_sample.json
-│   └── battery_strategy_skon_payload.json
-├── notebooks/
-│   └── Battery-Comparative-SWOT-ReportAgent.py
+│   │   ├── analyst_report.pdf
+│   │   ├── catl.pdf
+│   │   ├── market_report.pdf
+│   │   └── skon.pdf
+│   └── vectorstores/               # FAISS 인덱스 (build-indices 후 생성)
+│       ├── manifest.json
+│       ├── market_agent/
+│       ├── skon_agent/
+│       ├── catl_agent/
+│       ├── swot_agent/
+│       └── report_agent/
 ├── results/
-│   └── battery_market_strategy_report.json
+│   └── battery_market_strategy_report.docx
 ├── src/
 │   ├── agents/
 │   │   ├── comparative_swot.py
 │   │   ├── market_agent.py
 │   │   ├── report_agent.py
 │   │   └── strategy_agent.py
-│   ├── phase1/
-│   │   └── market_phase.py
-│   ├── orchestrator/
-│   │   └── orchestrator.py         # Central Orchestrator 그래프
+│   ├── phases/
+│   │   ├── market_phase.py         # Phase 1: 시장 분석
+│   │   ├── strategy_phase.py       # Phase 2: 전략 분석 (Fan-out/in)
+│   │   └── analysis_phase.py       # Phase 3: SWOT + 보고서 생성
 │   ├── prompts/
 │   │   ├── market_prompt.py
 │   │   └── strategy_prompt.py
@@ -201,8 +193,10 @@ SKATL/
 │   │   ├── phase1_state.py
 │   │   └── state.py
 │   ├── tools/
+│   │   ├── hitl_feedback.py        # Human-in-the-Loop 피드백 처리
 │   │   ├── rag_pipeline.py         # Agentic RAG (FAISS + 쿼리 재작성)
 │   │   ├── rag_tool.py             # LangChain @tool 래핑
+│   │   ├── tool_source_parser.py   # 출처 파싱 유틸리티
 │   │   └── web_search_tool.py      # Tavily 웹 검색 도구
 │   └── logging_utils.py            # 구조화 로깅
 ├── app.py                          # 실행 진입점
