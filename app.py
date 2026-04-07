@@ -59,7 +59,14 @@ from tools.rag_tool import initialize_rag_pipelines_with_stores
 from logging_utils import get_logger
 
 
-logger = get_logger("app")
+    build_parser = subparsers.add_parser("build-indices", help="Build one shared FAISS index for all agent profiles")
+    _add_common_config_args(build_parser)
+    build_parser.add_argument(
+        "--collection",
+        action="append",
+        choices=get_collection_names(),
+        help="Limit the printed profile summary to selected agent profiles.",
+    )
 
 MAX_REPORT_RETRIES = 3   # HITL #3 최대 거절 횟수
 

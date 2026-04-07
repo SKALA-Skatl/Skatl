@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
+SHARED_INDEX_DIRNAME = "shared"
 
 
 @dataclass(slots=True)
@@ -25,6 +26,9 @@ class RAGConfig:
 
     def resolved_index_dir(self, root: Path) -> Path:
         return (root / self.index_dir).resolve() if not self.index_dir.is_absolute() else self.index_dir
+
+    def resolved_shared_index_dir(self, root: Path) -> Path:
+        return self.resolved_index_dir(root) / SHARED_INDEX_DIRNAME
 
     def resolved_collection_dir(self, root: Path, collection_name: str) -> Path:
         return self.resolved_index_dir(root) / collection_name
